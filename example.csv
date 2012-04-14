@@ -1,0 +1,4 @@
+First Two rows are for comment, Plugin skips the first two rows while parsing
+
+reminder_title, reminder_info, reminder_date, reminder_time, sms_mobile, voice_phone, email_address, author
+Sohag, this is Sohag, 1/27/2012, 8:20pm, 0135877, 01913515375, hyde.sohag@gmail.com, admin
