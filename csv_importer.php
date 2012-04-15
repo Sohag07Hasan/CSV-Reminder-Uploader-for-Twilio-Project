@@ -102,8 +102,9 @@ class CSVImporterPlugin {
 						$this->post();
 					 }
 					 else{
-						$headers = $this->csv_key_assign();
+						
 						$file_location = $this->upload_csv();
+						$headers = $this->csv_key_assign($file_location);
 						
 					 }
 					
@@ -153,11 +154,12 @@ class CSVImporterPlugin {
     /*
      * This will create table to assing the column name against each csv column name
      * */
-    function  csv_key_assign(){
-		require_once dirname(__FILE__) . '/File_CSV_DataSource/DataSource.php';
-		$file = $_FILES['csv_import']['tmp_name'];
+    function  csv_key_assign($file){
+		if(!$file) return false;
 		
-		$this->stripBOM($file);
+		require_once dirname(__FILE__) . '/File_CSV_DataSource/DataSource.php';
+				
+		
 		$csv = new File_CSV_DataSource();
 
         if (!$csv->load($file)) {
@@ -180,6 +182,7 @@ class CSVImporterPlugin {
 
 
     <?php if (!empty($this->log['error'])): ?>
+    <?php array_unique($this->log['error']); ?>
 
     <div class="error">
 
@@ -226,6 +229,9 @@ class CSVImporterPlugin {
             return;
 		 }
 		 
+		 //sanitizing the csv files
+		 $this->stripBOM($_FILES['csv_import']['tmp_name']);
+		 
         //upload the csv file to server
                 
 		$dirs = wp_upload_dir();
@@ -254,74 +260,95 @@ class CSVImporterPlugin {
      * @param array $options
      * @return void
      */
-    function post() {				     
+    function post() {
+				
+		if($_POST['reminder_title'] == 'post_title' && $_POST['reminder_info'] == 'post_content' && $_POST['reminder_date'] == 'post_date' && $_POST['reminder_time'] == 'post_time') :							     
 
-        require_once dirname(__FILE__) . '/File_CSV_DataSource/DataSource.php';
+			require_once dirname(__FILE__) . '/File_CSV_DataSource/DataSource.php';
 
-        $time_start = microtime(true);        
-        $file = $_POST['uploaded_file'];
-       // $this->stripBOM($file);
+			$time_start = microtime(true);        
+			$file = $_POST['uploaded_file'];
+		   // $this->stripBOM($file);
 
-		$csv = new File_CSV_DataSource();
+			$csv = new File_CSV_DataSource();
 
-        if (!$csv->load($file)) {
-            $this->log['error'][] = 'Failed to load file, aborting.';
-            $this->print_messages();
-            return;
-        }		
-		
-		$headers = $csv->getHeaders();
-		
-        // pad shorter rows with empty values
-        $csv->symmetrize();
-     
+			if (!$csv->load($file)) {
+				$this->log['error'][] = 'Failed to load file, aborting.';
+				$this->print_messages();
+				return;
+			}		
+			
+			$headers = $csv->getHeaders();
+			
+			// pad shorter rows with empty values
+			$csv->symmetrize();
+		 
 
-        $skipped = 0;
-        $imported = 0;
-        $comments = 0;
-        foreach ($csv->connect() as $csv_data) {
-			$data = array();
-			foreach($csv_data as $k=>$v){
-				$k = preg_replace('[ ]','',$k);
-				$data[$k] = trim($v);
+			$skipped = 0;
+			$imported = 0;
+			$comments = 0;
+			foreach ($csv->connect() as $csv_data) {
+				$data = array();
+				foreach($csv_data as $k=>$v){
+					$k = preg_replace('[ ]','',$k);
+					$data[$k] = trim($v);
+				}
+				
+				//creating the post
+				$post_id = $this->create_post($data, $headers);			
+				
+				if($post_id){
+					$imported++;               
+					$this->create_custom_fields($post_id, $data, $headers);
+				} else {
+					$skipped++;
+				}
 			}
-			
-			//creating the post
-			$post_id = $this->create_post($data, $headers);
-			
-            if($post_id){
-                $imported++;               
-                $this->create_custom_fields($post_id, $data);
-            } else {
-                $skipped++;
-            }
-        }
 
-        if (file_exists($file)) {
-            @unlink($file);
-        }
+			if (file_exists($file)) {
+				@unlink($file);
+			}
 
-        $exec_time = microtime(true) - $time_start;
+			$exec_time = microtime(true) - $time_start;
 
-        if ($skipped) {
-            $this->log['notice'][] = "<b>Skipped {$skipped} posts (most likely due to empty title, body and excerpt).</b>";
-        }
-        $this->log['notice'][] = sprintf("<b>Imported {$imported} posts in %.2f seconds.</b>", $exec_time);
-        $this->print_messages();
+			if ($skipped) {
+				$this->log['notice'][] = "<b>Skipped {$skipped} posts (most likely due to empty title, body and excerpt).</b>";
+			}
+			$this->log['notice'][] = sprintf("<b>Imported {$imported} posts in %.2f seconds.</b>", $exec_time);
+			$this->print_messages();
+        
+        else :
+			$this->log['error'][] = "<b> Please check Reminder Title or Reminder description or Reminder Date and time against right key! Aborting..... </b>";
+			$this->print_messages();
+			return;
+        endif;
     }
 
+
+	/*
+	 * csv column name to sorting table column
+	 *  */
+	 function csv_col_vs_table_col($switch_key, $headers, $data = array()){
+		foreach($_POST as $key=>$value) :
+			if($switch_key == $value){
+				return $data[$key];
+			}
+		endforeach;
+	 }
+	 
+	 
+
     function create_post($data, $headers) {	
-		                 
+		              
         $new_post = array(
-            'post_title'   => convert_chars($data['reminder_title']),
-            'post_content' => wpautop(convert_chars($data['reminder_title'])),
+            'post_title'   => $this->csv_col_vs_table_col('post_title', $headers, $data),
+            'post_content' => $this->csv_col_vs_table_col('post_content', $headers, $data),
             'post_status'  => 'publish',
             'post_type'    => 'reminderagent',
-            'post_date'    => $this->parse_date($data['reminder_date'], $data['reminder_time']),
+            'post_date'    => $this->parse_date($this->csv_col_vs_table_col('post_date', $headers, $data), $this->csv_col_vs_table_col('post_time', $headers, $data))
             
-          );
-
-
+          );		
+		
         // create!
         $id = wp_insert_post($new_post);
         if($id){
