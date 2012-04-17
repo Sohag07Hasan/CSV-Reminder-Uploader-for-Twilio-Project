@@ -53,10 +53,10 @@ class CSVImporterPlugin {
     );
     
    var $new_post = array(
-            'post_title'   => 'Reminder Title',
-            'post_content' => 'Description for Reminder',
-            'post_date'    => 'Reminder Date',
-            'post_time'    => 'Reminder Time',
+            'post_title'   => '<b>Reminder Title</b> (Example: John Doe 555-555-5555)',
+            'post_content' => 'Reminder Info / Date & Time of Appt (Example: 4/15/2012 at 4:00 PM)',
+            'post_date'    => 'Reminder Date (Date to Send Reminder)',
+            'post_time'    => 'Reminder Time (Time to Send Reminder)',
             'mobile'	   => 'Mobile Number for SMS',
             'phone'		   => 'Phone Number for Voice',
             'email'		   => 'Email address to send email'            
@@ -69,7 +69,7 @@ class CSVImporterPlugin {
      * creates select for the form
      * */
      function get_select(){
-		 $options = '';
+		 $options = '<option value="null">Select</option>';
 		foreach($this->new_post as $key=>$value){
 			$options .= "<option value='$key'>$value</option>";			
 		}
@@ -216,43 +216,50 @@ class CSVImporterPlugin {
     /*
      * Uploads csv to server and waits for user verification clicks
      * */
-     function upload_csv(){		
+     function upload_csv(){		 
+		
 		 
 		if (empty($_FILES['csv_import']['tmp_name'])) {
             $this->log['error'][] = 'No CSV is selected, aborting....';
             $this->print_messages();
             return;
         }
-         if($_FILES['csv_import']['type'] != 'text/csv') {
+        
+        if(preg_match('#\.csv#', $_FILES["csv_import"]["name"])) :
+         //if($_FILES['csv_import']['type'] == "text/csv") :		  
+		 
+			 //sanitizing the csv files
+			 $this->stripBOM($_FILES['csv_import']['tmp_name']);
+			 
+			//upload the csv file to server
+					
+			$dirs = wp_upload_dir();
+			$basedir = $dirs['basedir'];
+			$baseurl = $dirs['baseurl'];
+			$csv_dir = $basedir . '/reminder-csv';    
+			$csv_file = $csv_dir . '/' . preg_replace('/[ ]/', '',$_FILES['csv_import']['name']);
+			   
+			if(is_dir($csv_dir)){
+				if(move_uploaded_file($_FILES['csv_import']['tmp_name'], $csv_file)) return $csv_file;
+				
+			}
+			else{
+				@mkdir($csv_dir);
+				if(move_uploaded_file($_FILES['csv_import']['tmp_name'], $csv_file)) return $csv_file;
+			}
+			
+			$this->log['error'][] = 'Upload directoy is write protected. Please make the upload direcoty under wp-content writable and try again, aborting....';
+			$this->print_messages();
+			return false; 
+        
+        else :
 			$this->log['error'][] = 'File must be a csv file, aborting....';
             $this->print_messages();
             return;
-		 }
-		 
-		 //sanitizing the csv files
-		 $this->stripBOM($_FILES['csv_import']['tmp_name']);
-		 
-        //upload the csv file to server
-                
-		$dirs = wp_upload_dir();
-		$basedir = $dirs['basedir'];
-		$baseurl = $dirs['baseurl'];
-		$csv_dir = $basedir . '/reminder-csv';    
-		$csv_file = $csv_dir . '/' . preg_replace('/[ ]/', '',$_FILES['csv_import']['name']);
-		   
-        if(is_dir($csv_dir)){
-			if(move_uploaded_file($_FILES['csv_import']['tmp_name'], $csv_file)) return $csv_file;
-			
-		}
-		else{
-			@mkdir($csv_dir);
-			if(move_uploaded_file($_FILES['csv_import']['tmp_name'], $csv_file)) return $csv_file;
-		}
-		
-		$this->log['error'][] = 'Upload directoy is write protected. Please make the upload direcoty under wp-content writable and try again, aborting....';
-        $this->print_messages();
-        return false;      
+        endif;     
 	 }
+	 
+	 
 
     /**
      * Handle POST submission
