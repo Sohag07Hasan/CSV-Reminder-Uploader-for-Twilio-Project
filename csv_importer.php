@@ -1,42 +1,13 @@
 <?php
 /*
 Plugin Name: CSV Reminder Importer
-Description: Import data as posts from a CSV file. <em>You can reach the author at <a href="mailto:d.v.kobozev@gmail.com">d.v.kobozev@gmail.com</a></em>.
-Version: 0.3.7
-Author: Denis Kobozev
+Description: Import data as posts from a CSV file. 
+Version: 1.1.1
+Author: Mahibul Hasan Sohag
+Author Uri: http://sohag.me
+Plugins Uri: http://kindly-remind.com
 */
 
-/**
- * LICENSE: The MIT License {{{
- *
- * Copyright (c) <2009> <Denis Kobozev>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- * @author    Denis Kobozev <d.v.kobozev@gmail.com>
- * @copyright 2009 Denis Kobozev
- * @license   The MIT License
- * }}}
- */
- 
- 
- 
 
 class CSVImporterPlugin {
     var $defaults = array(
@@ -76,81 +47,8 @@ class CSVImporterPlugin {
 		
 		return $options;
 	 }
-     
-    
-    /**
-     * Plugin's interface
-     *
-     * @return void
-     */
-    function form() {     
-       
-        
-        $csv_link = plugins_url('/',__FILE__) . 'example.csv';
-
-				// form HTML {{{
-		?>
-
-		<div class="wrap">
-			<?php screen_icon('tools'); ?>
-			<h2>Import Reminders as CSV</h2>
-			<br/>
-			
-			<?php
-				
-				 if ($_POST['reminder-import-csv'] == 'Y') {
-					if($_POST['uploaded_file_yes'] == 'Y') {
-						$this->post();
-					 }
-					 else{
-						
-						$file_location = $this->upload_csv();
-						$headers = $this->csv_key_assign($file_location);
-						
-					 }
-					
-				 }
-			?>	
-			
-			
-			<div>
-				<img src="http://kindly-remind.com/instructions.jpg" alt='instruction' /> <br/>
-				<a href="http://kindly-remind.com/example.csv"> Example </a>
-			</div>
-			
-			
-			<form action="" class="form-table" method="post" enctype="multipart/form-data">
-				<input type="hidden" name="reminder-import-csv" value="Y" />
-				
-				<?php if($file_location) :	?>
-					<input type="hidden" name="uploaded_file" value="<?php echo $file_location; ?>" />
-					<input type="hidden" name="uploaded_file_yes" value="Y" />
-					
-					<?php
-						if(is_array($headers)) :
-							include dirname(__FILE__) . '/includes/headers-table.php';
-						endif;
-					?>
-					
-					<input type="submit" value="Continue" class="button-primary" />
-				<?php else : ?>
-					  
-				<!-- File input -->
-				<p>
-					<label for="csv_import">Upload file:</label>
-						<input name="csv_import" id="csv_import" type="file" value="" aria-required="true" />
-				   <input type="submit" class="button" name="submit" value="Import" />
-			   </p>
-			   <?php endif; ?>
-			   
-			</form>
-		</div><!-- end wrap -->
-
-		<?php
-				// end form HTML }}}
-
-    }  
-    
+      
+   
     
     /*
      * This will create table to assing the column name against each csv column name
@@ -438,6 +336,7 @@ class CSVImporterPlugin {
 		return $time . ':00';
 	  }
 
+
     /**
      * Delete BOM from UTF-8 file.
      *
@@ -473,7 +372,8 @@ class CSVImporterPlugin {
     /*
      * Latest Form
      * */
-    function latest_form(){
+     
+    function form(){
 		?>
 		<div class="wrap">
 			<?php screen_icon('tools'); ?>
@@ -483,8 +383,11 @@ class CSVImporterPlugin {
 		<?php
 			//including necessary files
 			if($_POST['step-one'] == 'Y'){
+				
 				$file_location = $this->upload_csv();
 				$headers = $this->csv_key_assign($file_location);
+				
+				
 				if($file_location){
 					include dirname(__FILE__) . '/includes/step-two-form.php';
 				}
@@ -496,6 +399,15 @@ class CSVImporterPlugin {
 			elseif($_POST['step-two'] == 'Y'){
 				if($_POST['first_name'] == 'first_name' && $_POST['phone_number'] == 'phone_number' && $_POST['mobile_number'] == 'mobile_number' && $_POST['appointment_date'] == 'appointment_date' && $_POST['appointment_time'] == 'appointment_time' && $_POST['email_address'] == 'email_address'){
 					include dirname(__FILE__) . '/includes/step-three-form.php';
+				}
+				else{
+					//trigger the error message
+					$this->log['error'][] = "Invalid Key assigned! Try with correct selection..";
+					$this->print_messages();					
+					
+					$file_location = $_POST['csv-location'];
+					$headers = $this->csv_key_assign($file_location);
+					include dirname(__FILE__) . '/includes/step-two-form.php';
 				}
 			}
 			elseif($_POST['step-three'] == 'Y'){
@@ -519,10 +431,10 @@ function csv_admin_menu() {
     $plugin = new CSVImporterPlugin;
     //add_management_page('edit.php', 'CSV Importer', 'manage_options', __FILE__,
     if(current_user_can('calendermenu')) :
-		add_submenu_page('edit.php?post_type=reminderagent', 'Import from CSV', 'Import from CSV', 'calendermenu', 'reminder_import',array($plugin, 'latest_form'));
+		add_submenu_page('edit.php?post_type=reminderagent', 'Import from CSV', 'Import from CSV', 'calendermenu', 'reminder_import',array($plugin, 'form'));
 	else :
 		add_submenu_page('edit.php?post_type=reminderagent', 'Import from CSV', 'Import from CSV', 'manage_options', 'reminder_import',
-        array($plugin, 'latest_form'));
+        array($plugin, 'form'));
     endif;
 }
 
