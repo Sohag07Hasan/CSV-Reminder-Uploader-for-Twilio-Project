@@ -26,6 +26,7 @@ class CSVImporterPlugin {
    var $new_post = array(
             'first_name'   => 'Customer First Name (Example: John)',
             'last_name'   => 'Customer Last Name (Example: Doe)',            
+            'full_name'   => 'Customer First Name + Last Name (Example: John Doe)',            
             'phone_number'    => 'Customer Phone Number (Example: 5555555555)',
             'mobile_number'    => 'Customer Mobil Number (Example: 5555555555)',
             'appointment_date'    => 'Appointment Date ',
@@ -276,13 +277,25 @@ class CSVImporterPlugin {
 			
         update_post_meta($post_id, "_reminderagent_content", $data['appointment_date'] . ' at ' . $data['appointment_time']);
         update_post_meta($post_id, "_sent", '');
-		update_post_meta($post_id, "_reminderagent_sms_phone", $data["mobile_number"]);
-		update_post_meta($post_id, "_reminderagent_sms_message", get_user_meta($user_ID, 'reminderagent_sms', true));
-		update_post_meta($post_id, "_reminderagent_voice_phone", $data["phone_number"]);
-		update_post_meta($post_id, "_reminderagent_voice_message", get_user_meta($user_ID, 'reminderagent_tts', true));
-		//update_post_meta($post_id, "_reminderagent_audio_source", $_POST["reminderagent_audio_source"]);
-		update_post_meta($post_id, "_reminderagent_email_address", $data["email_address"]);
-		update_post_meta($post_id, "_reminderagent_email_message", get_user_meta($user_ID, 'reminderagent_email', true));        
+        
+        //update the mobile number with sms if sms notification is set
+        if(in_array('sms', $_POST['remnder-type'])) :
+			update_post_meta($post_id, "_reminderagent_sms_phone", $data["mobile_number"]);
+			update_post_meta($post_id, "_reminderagent_sms_message", get_user_meta($user_ID, 'reminderagent_sms', true));
+		endif;
+		
+		
+		//update the phone number if the voice notification is set
+		if(in_array('voice', $_POST['remnder-type'])) :
+			update_post_meta($post_id, "_reminderagent_voice_phone", $data["phone_number"]);
+			update_post_meta($post_id, "_reminderagent_voice_message", get_user_meta($user_ID, 'reminderagent_tts', true));
+		endif;
+		
+		//update thie email details if the email noitifcation is set
+		if(in_array('email', $_POST['remnder-type'])) :
+			update_post_meta($post_id, "_reminderagent_email_address", $data["email_address"]);
+			update_post_meta($post_id, "_reminderagent_email_message", get_user_meta($user_ID, 'reminderagent_email', true));
+		endif;        
     }
    
     /**
@@ -400,6 +413,9 @@ class CSVImporterPlugin {
 				if($_POST['first_name'] == 'first_name' && $_POST['phone_number'] == 'phone_number' && $_POST['mobile_number'] == 'mobile_number' && $_POST['appointment_date'] == 'appointment_date' && $_POST['appointment_time'] == 'appointment_time' && $_POST['email_address'] == 'email_address'){
 					include dirname(__FILE__) . '/includes/step-three-form.php';
 				}
+				elseif($_POST['full_name'] == 'full_name' && $_POST['phone_number'] == 'phone_number' && $_POST['mobile_number'] == 'mobile_number' && $_POST['appointment_date'] == 'appointment_date' && $_POST['appointment_time'] == 'appointment_time' && $_POST['email_address'] == 'email_address'){
+					include dirname(__FILE__) . '/includes/step-three-form.php';
+				}
 				else{
 					//trigger the error message
 					$this->log['error'][] = "Invalid Key assigned! Try with correct selection..";
@@ -411,8 +427,15 @@ class CSVImporterPlugin {
 				}
 			}
 			elseif($_POST['step-three'] == 'Y'){
-				$this->post();
-				include dirname(__FILE__) . '/includes/step-one-form.php';
+				if(empty($_POST['remnder-type'])){
+					$this->log['error'][] = "Please choose at least one Notification method..";
+					$this->print_messages();
+					include dirname(__FILE__) . '/includes/step-three-form.php';
+				}
+				else{
+					$this->post();
+					include dirname(__FILE__) . '/includes/step-one-form.php';
+				}
 			}
 			else{				
 				include dirname(__FILE__) . '/includes/step-one-form.php';

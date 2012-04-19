@@ -15,10 +15,11 @@
 	<input type="radio" name="reminder_time" value="72" /> 72 Hours Advance
 	<br/>
 
-	<h4>How do you wish to notify? </h4>
-	<input type="checkbox" checked name="remnder-type" value="sms"> Text (SMS) <br/>
-	<input type="checkbox" checked name="remnder-type" value="voice"> Voice Message <br/>
-	<input type="checkbox" checked name="remnder-type" value="email"> Email <br/>
+	<h4>How do you wish to notify?  </h4>
+	<code>Choose at least one!</code><br/>
+	<input type="checkbox" checked name="remnder-type[]" value="sms"> Text (SMS) <br/>
+	<input type="checkbox" checked name="remnder-type[]" value="voice"> Voice Message <br/>
+	<input type="checkbox" checked name="remnder-type[]" value="email"> Email <br/>
 	<br/>
 	
 	<input type="submit" value="Continue" class="button-primary" />	

@@ -1,4 +1,2 @@
-First Two rows are for comment, Plugin skips the first two rows while parsing
-
 first_name, last_name, phone_number, mobile_number, appointment_date, appointment_time, email_address
 Sohag, Hasan, 01913515375, 01913515375, 4/25/2012, 12:50 pm, hyde.sohag@gmail.com

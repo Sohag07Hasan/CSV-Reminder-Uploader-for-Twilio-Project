@@ -11,12 +11,7 @@
 	?>
 
 	<table>
-		<tr>
-			<td><h4>LABEL HERE</h4></td>
-			<td>&nbsp; &nbsp;</td>
-							
-			<td><h4>LABEL HERE</h4></td>
-		</tr>
+		
 		<?php
 			foreach($headers as $header) :
 			?>

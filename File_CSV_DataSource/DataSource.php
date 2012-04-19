@@ -2149,14 +2149,12 @@ class File_CSV_DataSource
 
         while ($keys = fgetcsv($res, $l, $d, $e)) {
 			
-			if($c > 1) :
-				if ($c == 2) {
-					$this->headers = $keys;
-				} else {
-					array_push($this->rows, $keys);
-				}
-			
-			endif;
+		
+			if ($c == 0) {
+				$this->headers = $keys;
+			} else {
+				array_push($this->rows, $keys);
+			}			
 			
             $c ++;
         }
