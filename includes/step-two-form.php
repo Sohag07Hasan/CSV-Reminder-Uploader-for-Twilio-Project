@@ -19,7 +19,7 @@
 				<tr>
 					<td> <?php echo $header; ?> </td>
 					<td> = </td>
-					<td><select name="<?php echo $header; ?>"><?php echo $selects; ?></select></td>
+					<td><select name="<?php echo preg_replace('#[ ]#', '', $header); ?>"><?php echo $selects; ?></select></td>
 				</tr>
 				
 			<?php	

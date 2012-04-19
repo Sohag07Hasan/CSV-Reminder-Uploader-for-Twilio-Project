@@ -7,6 +7,12 @@
 	<input type="hidden" name="csv-location" value="<?php echo $_POST['csv-location'];?>" />
 	<input type="hidden" name="step-three" value="Y">
 	
+	<?php
+		foreach($headers_key_vs_defalut_keys as $key=>$value){
+			echo "<input type='hidden' name='$key' value='$value' />";
+		}
+	?>
+	
 	<h4>When do you wish to send the reminders?</h4>
 	<input type="radio" checked name="reminder_time" value="24" /> 24 Hours Advance
 	<br/>

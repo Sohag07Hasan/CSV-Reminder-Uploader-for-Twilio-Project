@@ -189,19 +189,22 @@ class CSVImporterPlugin {
 			$skipped = 0;
 			$imported = 0;
 			$comments = 0;
+			
+			$headers_key_vs_defalut_keys = $this->parsing_headerskey_with_csvkeys();
+			$head_keys = array_flip($headers_key_vs_defalut_keys);			
 			foreach ($csv->connect() as $csv_data) {
 				$data = array();
 				foreach($csv_data as $k=>$v){
-					$k = preg_replace('[ ]','',$k);
+					$k = preg_replace('#[ ]#','',$k);
 					$data[$k] = trim($v);
 				}
-				
+
 				//creating the post
-				$post_id = $this->create_post($data);			
-				
+				$post_id = $this->create_post($data, $head_keys);			
+
 				if($post_id){
 					$imported++;               
-					$this->create_custom_fields($post_id, $data);
+					$this->create_custom_fields($post_id, $data, $head_keys);
 				} else {
 					$skipped++;
 				}
@@ -235,19 +238,24 @@ class CSVImporterPlugin {
 	 
 	 
 
-    function create_post($data) {		
-		
-		$name = $data['first_name'];
-		if(isset($data['last_name'])){
-			$name .= ' ' . $data['last_name'];
+    function create_post($data, $head_keys) {
+					
+		if(isset($data[$head_keys['full_name']])){
+			$name = $data[$head_keys['full_name']];
+		}
+		else{
+			$name = $data[$head_keys['first_name']];
+			if(isset($data[$head_keys['last_name']])){
+				$name .= ' ' . $data[$head_keys['last_name']];
+			}
 		}
 		
 		$new_post = array(
-			'post_title' => $name . ' ' . $data['mobile_number'],
-			'post_content' => $data['appointment_date'] . ' at ' . $data['appointment_time'],
+			'post_title' => $name . ' ' . $data[$head_keys['mobile_number']],
+			'post_content' => $data[$head_keys['appointment_date']] . ' at ' . $data[$head_keys['appointment_time']],
 			'post_status'  => 'publish',
 			'post_type'    => 'reminderagent',
-			'post_date'    => $this->parse_date($data['appointment_date'], $data['appointment_time'])
+			'post_date'    => $this->parse_date($data[$head_keys['appointment_date']], $data[$head_keys['appointment_time']])
 			
 		);
 		
@@ -270,30 +278,30 @@ class CSVImporterPlugin {
 	 }
     
 
-    function create_custom_fields($post_id, $data) {
+    function create_custom_fields($post_id, $data, $head_keys) {
 		
 		
 		global $user_ID;		
 			
-        update_post_meta($post_id, "_reminderagent_content", $data['appointment_date'] . ' at ' . $data['appointment_time']);
+        update_post_meta($post_id, "_reminderagent_content", $data[$head_keys['appointment_date']] . ' at ' . $data[$head_keys['appointment_time']]);
         update_post_meta($post_id, "_sent", '');
         
         //update the mobile number with sms if sms notification is set
         if(in_array('sms', $_POST['remnder-type'])) :
-			update_post_meta($post_id, "_reminderagent_sms_phone", $data["mobile_number"]);
+			update_post_meta($post_id, "_reminderagent_sms_phone", $data[$head_keys["mobile_number"]]);
 			update_post_meta($post_id, "_reminderagent_sms_message", get_user_meta($user_ID, 'reminderagent_sms', true));
 		endif;
 		
 		
 		//update the phone number if the voice notification is set
 		if(in_array('voice', $_POST['remnder-type'])) :
-			update_post_meta($post_id, "_reminderagent_voice_phone", $data["phone_number"]);
+			update_post_meta($post_id, "_reminderagent_voice_phone", $data[$head_keys["phone_number"]]);
 			update_post_meta($post_id, "_reminderagent_voice_message", get_user_meta($user_ID, 'reminderagent_tts', true));
 		endif;
 		
 		//update thie email details if the email noitifcation is set
 		if(in_array('email', $_POST['remnder-type'])) :
-			update_post_meta($post_id, "_reminderagent_email_address", $data["email_address"]);
+			update_post_meta($post_id, "_reminderagent_email_address", $data[$head_keys["email_address"]]);
 			update_post_meta($post_id, "_reminderagent_email_message", get_user_meta($user_ID, 'reminderagent_email', true));
 		endif;        
     }
@@ -387,6 +395,73 @@ class CSVImporterPlugin {
      * */
      
     function form(){
+		?>
+		<div class="wrap">
+			<?php screen_icon('tools'); ?>
+			<h2>Import Reminders as CSV</h2>
+			<br/>			
+			
+		<?php
+			//including necessary files
+			if($_POST['step-one'] == 'Y'){
+				
+				$file_location = $this->upload_csv();
+				$headers = $this->csv_key_assign($file_location);
+				
+				
+				if($file_location){
+					include dirname(__FILE__) . '/includes/step-two-form.php';
+				}
+				else{
+					include dirname(__FILE__) . '/includes/step-one-form.php';
+				}
+				
+			}
+			elseif($_POST['step-two'] == 'Y'){
+				
+				$headers_key_vs_defalut_keys = $this->parsing_headerskey_with_csvkeys();
+				//var_dump($headers_key_vs_defalut_keys);								
+				include dirname(__FILE__) . '/includes/step-three-form.php';
+			}
+			elseif($_POST['step-three'] == 'Y'){
+				if(empty($_POST['remnder-type'])){
+					$headers_key_vs_defalut_keys = $this->parsing_headerskey_with_csvkeys();
+					
+					$this->log['error'][] = "Please choose at least one Notification method..";
+					$this->print_messages();					
+					include dirname(__FILE__) . '/includes/step-three-form.php';
+				}
+				else{
+					$this->post();
+					include dirname(__FILE__) . '/includes/step-one-form.php';
+				}
+			}
+			else{				
+				include dirname(__FILE__) . '/includes/step-one-form.php';
+			}	
+		?>
+		
+		</div>
+				
+		<?php	
+	} 
+	
+	function parsing_headerskey_with_csvkeys(){
+		$headers = $this->csv_key_assign($_POST['csv-location']);
+		$array = array();
+		foreach($headers as $header){
+			$header = preg_replace('#[ ]#', '', $header);
+			if($_POST[$header] == '') continue;
+			$array[$header] = $_POST[$header];
+		}
+		
+		
+		$array = array_unique($array);		
+		return $array;
+	}
+	
+	
+	 function inform(){
 		?>
 		<div class="wrap">
 			<?php screen_icon('tools'); ?>
