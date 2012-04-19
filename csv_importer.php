@@ -53,13 +53,13 @@ class CSVImporterPlugin {
     );
     
    var $new_post = array(
-            'post_title'   => '<b>Reminder Title</b> (Example: John Doe 555-555-5555)',
-            'post_content' => 'Reminder Info / Date & Time of Appt (Example: 4/15/2012 at 4:00 PM)',
-            'post_date'    => 'Reminder Date (Date to Send Reminder)',
-            'post_time'    => 'Reminder Time (Time to Send Reminder)',
-            'mobile'	   => 'Mobile Number for SMS',
-            'phone'		   => 'Phone Number for Voice',
-            'email'		   => 'Email address to send email'            
+            'first_name'   => 'Customer First Name (Example: John)',
+            'last_name'   => 'Customer Last Name (Example: Doe)',            
+            'phone_number'    => 'Customer Phone Number (Example: 5555555555)',
+            'mobile_number'    => 'Customer Mobil Number (Example: 5555555555)',
+            'appointment_date'    => 'Appointment Date ',
+            'appointment_time'	   => 'Appointment Time',            
+            'email_address'		   => 'Email address to send email'            
           );
 
     var $log = array();
@@ -69,7 +69,7 @@ class CSVImporterPlugin {
      * creates select for the form
      * */
      function get_select(){
-		 $options = '<option value="null">Select</option>';
+		 $options = '<option value="">Select</option>';
 		foreach($this->new_post as $key=>$value){
 			$options .= "<option value='$key'>$value</option>";			
 		}
@@ -97,6 +97,7 @@ class CSVImporterPlugin {
 			<br/>
 			
 			<?php
+				
 				 if ($_POST['reminder-import-csv'] == 'Y') {
 					if($_POST['uploaded_file_yes'] == 'Y') {
 						$this->post();
@@ -131,7 +132,7 @@ class CSVImporterPlugin {
 						endif;
 					?>
 					
-					<input type="submit" value="import" class="button-primary" />
+					<input type="submit" value="Continue" class="button-primary" />
 				<?php else : ?>
 					  
 				<!-- File input -->
@@ -267,25 +268,20 @@ class CSVImporterPlugin {
      * @param array $options
      * @return void
      */
-    function post() {
-				
-		if($_POST['reminder_title'] == 'post_title' && $_POST['reminder_info'] == 'post_content' && $_POST['reminder_date'] == 'post_date' && $_POST['reminder_time'] == 'post_time') :							     
+    function post() {							     
 
 			require_once dirname(__FILE__) . '/File_CSV_DataSource/DataSource.php';
 
 			$time_start = microtime(true);        
-			$file = $_POST['uploaded_file'];
-		   // $this->stripBOM($file);
-
+			$file = $_POST['csv-location'];
+		   
 			$csv = new File_CSV_DataSource();
 
 			if (!$csv->load($file)) {
 				$this->log['error'][] = 'Failed to load file, aborting.';
 				$this->print_messages();
 				return;
-			}		
-			
-			$headers = $csv->getHeaders();
+			}			
 			
 			// pad shorter rows with empty values
 			$csv->symmetrize();
@@ -302,11 +298,11 @@ class CSVImporterPlugin {
 				}
 				
 				//creating the post
-				$post_id = $this->create_post($data, $headers);			
+				$post_id = $this->create_post($data);			
 				
 				if($post_id){
 					$imported++;               
-					$this->create_custom_fields($post_id, $data, $headers);
+					$this->create_custom_fields($post_id, $data);
 				} else {
 					$skipped++;
 				}
@@ -319,16 +315,11 @@ class CSVImporterPlugin {
 			$exec_time = microtime(true) - $time_start;
 
 			if ($skipped) {
-				$this->log['notice'][] = "<b>Skipped {$skipped} posts (most likely due to empty title, body and excerpt).</b>";
+				$this->log['notice'][] = "<b>Skipped {$skipped} Reminders (most likely due to empty title, body and excerpt).</b>";
 			}
-			$this->log['notice'][] = sprintf("<b>Imported {$imported} posts in %.2f seconds.</b>", $exec_time);
+			$this->log['notice'][] = sprintf("<b>Imported {$imported} Reminders in %.2f seconds.</b>", $exec_time);
 			$this->print_messages();
-        
-        else :
-			$this->log['error'][] = "<b> Please check Reminder Title or Reminder description or Reminder Date and time against right key! Aborting..... </b>";
-			$this->print_messages();
-			return;
-        endif;
+              
     }
 
 
@@ -345,16 +336,21 @@ class CSVImporterPlugin {
 	 
 	 
 
-    function create_post($data, $headers) {	
-		              
-        $new_post = array(
-            'post_title'   => $this->csv_col_vs_table_col('post_title', $headers, $data),
-            'post_content' => $this->csv_col_vs_table_col('post_content', $headers, $data),
-            'post_status'  => 'publish',
-            'post_type'    => 'reminderagent',
-            'post_date'    => $this->parse_date($this->csv_col_vs_table_col('post_date', $headers, $data), $this->csv_col_vs_table_col('post_time', $headers, $data))
-            
-          );		
+    function create_post($data) {		
+		
+		$name = $data['first_name'];
+		if(isset($data['last_name'])){
+			$name .= ' ' . $data['last_name'];
+		}
+		
+		$new_post = array(
+			'post_title' => $name . ' ' . $data['mobile_number'],
+			'post_content' => $data['appointment_date'] . ' at ' . $data['appointment_time'],
+			'post_status'  => 'publish',
+			'post_type'    => 'reminderagent',
+			'post_date'    => $this->parse_date($data['appointment_date'], $data['appointment_time'])
+			
+		);
 		
         // create!
         $id = wp_insert_post($new_post);
@@ -379,18 +375,16 @@ class CSVImporterPlugin {
 		
 		
 		global $user_ID;		
-		$userdata = get_userdata($user_ID);		
-		
-				
-        update_post_meta($post_id, "_reminderagent_content", $data["reminder_info"]);
+			
+        update_post_meta($post_id, "_reminderagent_content", $data['appointment_date'] . ' at ' . $data['appointment_time']);
         update_post_meta($post_id, "_sent", '');
-		update_post_meta($post_id, "_reminderagent_sms_phone", $data["sms_mobile"]);
-		update_post_meta($post_id, "_reminderagent_sms_message", get_user_meta($userdata->ID, 'reminderagent_sms', true));
-		update_post_meta($post_id, "_reminderagent_voice_phone", $data["voice_phone"]);
-		update_post_meta($post_id, "_reminderagent_voice_message", get_user_meta($userdata->ID, 'reminderagent_tts', true));
+		update_post_meta($post_id, "_reminderagent_sms_phone", $data["mobile_number"]);
+		update_post_meta($post_id, "_reminderagent_sms_message", get_user_meta($user_ID, 'reminderagent_sms', true));
+		update_post_meta($post_id, "_reminderagent_voice_phone", $data["phone_number"]);
+		update_post_meta($post_id, "_reminderagent_voice_message", get_user_meta($user_ID, 'reminderagent_tts', true));
 		//update_post_meta($post_id, "_reminderagent_audio_source", $_POST["reminderagent_audio_source"]);
 		update_post_meta($post_id, "_reminderagent_email_address", $data["email_address"]);
-		update_post_meta($post_id, "_reminderagent_email_message", get_user_meta($userdata->ID, 'reminderagent_email', true));        
+		update_post_meta($post_id, "_reminderagent_email_message", get_user_meta($user_ID, 'reminderagent_email', true));        
     }
    
     /**
@@ -402,11 +396,13 @@ class CSVImporterPlugin {
 		$time = $this->csvtime($time);
 		
         $timestamp = strtotime($data);
-       
+		
         
         if (false === $timestamp) {
             return '';
         } else {
+			$less = $_POST['reminder_time'] * 3600;
+			$timestamp -= $less;
             $date = date('Y-m-d', $timestamp);           
 			return $date .= ' ' . $time;
         }		
@@ -472,6 +468,49 @@ class CSVImporterPlugin {
             $this->log['error'][] = 'Failed to open file, aborting.';
         }
     }
+    
+    
+    /*
+     * Latest Form
+     * */
+    function latest_form(){
+		?>
+		<div class="wrap">
+			<?php screen_icon('tools'); ?>
+			<h2>Import Reminders as CSV</h2>
+			<br/>			
+			
+		<?php
+			//including necessary files
+			if($_POST['step-one'] == 'Y'){
+				$file_location = $this->upload_csv();
+				$headers = $this->csv_key_assign($file_location);
+				if($file_location){
+					include dirname(__FILE__) . '/includes/step-two-form.php';
+				}
+				else{
+					include dirname(__FILE__) . '/includes/step-one-form.php';
+				}
+				
+			}
+			elseif($_POST['step-two'] == 'Y'){
+				if($_POST['first_name'] == 'first_name' && $_POST['phone_number'] == 'phone_number' && $_POST['mobile_number'] == 'mobile_number' && $_POST['appointment_date'] == 'appointment_date' && $_POST['appointment_time'] == 'appointment_time' && $_POST['email_address'] == 'email_address'){
+					include dirname(__FILE__) . '/includes/step-three-form.php';
+				}
+			}
+			elseif($_POST['step-three'] == 'Y'){
+				$this->post();
+				include dirname(__FILE__) . '/includes/step-one-form.php';
+			}
+			else{				
+				include dirname(__FILE__) . '/includes/step-one-form.php';
+			}	
+		?>
+		
+		</div>
+				
+		<?php	
+	} 
 }
 
 
@@ -480,10 +519,10 @@ function csv_admin_menu() {
     $plugin = new CSVImporterPlugin;
     //add_management_page('edit.php', 'CSV Importer', 'manage_options', __FILE__,
     if(current_user_can('calendermenu')) :
-		add_submenu_page('edit.php?post_type=reminderagent', 'Import from CSV', 'Import from CSV', 'calendermenu', 'reminder_import',array($plugin, 'form'));
+		add_submenu_page('edit.php?post_type=reminderagent', 'Import from CSV', 'Import from CSV', 'calendermenu', 'reminder_import',array($plugin, 'latest_form'));
 	else :
 		add_submenu_page('edit.php?post_type=reminderagent', 'Import from CSV', 'Import from CSV', 'manage_options', 'reminder_import',
-        array($plugin, 'form'));
+        array($plugin, 'latest_form'));
     endif;
 }
 
